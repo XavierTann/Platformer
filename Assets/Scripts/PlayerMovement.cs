@@ -8,14 +8,25 @@ public class PlayerMovement : MonoBehaviour
     private float moveSpeed = 5f;
     private Vector2 moveDirection;
     private Vector2 facingDirection;
+
+    [Header("Movement Settings")]
     public InputActionReference move;
+
+    [Header("Attack Settings")]
     public InputActionReference attack;
 
+    private float attackStartTime;
     public float attackRange = 2f; // Range to detect enemies
     public LayerMask enemyLayer; // Layer mask for enemies
 
-    // Light and heavy attack
-    private float attackStartTime;
+    [Header("Jump Settings")]
+    public InputActionReference jump;
+    public float jumpForce = 500f; // Force applied for jumping
+
+    public LayerMask groundLayer; // Layer mask for the ground
+    public Transform groundCheck; // Reference to a ground check point
+    public float groundCheckRadius = 0.1f; // Radius for ground check
+    private bool isGrounded;
 
     private void Awake()
     {
@@ -29,37 +40,28 @@ public class PlayerMovement : MonoBehaviour
         {
             facingDirection = moveDirection.normalized;
         }
+
+        // Check if the player is on the ground
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+    }
+
+    private void FixedUpdate()
+    {
+        rb.linearVelocity = new Vector2(moveDirection.x * moveSpeed, rb.linearVelocity.y);
     }
 
     private void OnEnable()
     {
         attack.action.started += AttackStarted;
         attack.action.canceled += AttackEnded;
+        jump.action.started += Jump;
     }
 
     private void OnDisable()
     {
         attack.action.started -= AttackStarted;
         attack.action.canceled -= AttackEnded;
-    }
-
-    private void Attack(int damage)
-    {
-        RaycastHit2D hit = Physics2D.Raycast(rb.position, facingDirection, attackRange, enemyLayer);
-
-        if (hit.collider != null)
-        {
-            Debug.Log("Enemy is hit!");
-            // Get the GameObject that was hit
-            GameObject hitObject = hit.collider.gameObject;
-
-            // Example: Check if the object has an Enemy script and interact with it
-            Enemy enemy = hitObject.GetComponent<Enemy>();
-            if (enemy != null)
-            {
-                enemy.TakeDamage(damage, rb.position.x); // Assume TakeDamage method exists in the Enemy script
-            }
-        }
+        jump.action.started -= Jump;
     }
 
     private void AttackStarted(InputAction.CallbackContext context)
@@ -72,18 +74,35 @@ public class PlayerMovement : MonoBehaviour
         float attackDuration = Time.time - attackStartTime;
         if (attackDuration < 1f)
         {
-            Debug.Log("Light attack");
             Attack(1);
         }
         else
         {
-            Debug.Log("Heavy attack");
             Attack(10);
         }
     }
 
-    private void FixedUpdate()
+    private void Attack(int damage)
     {
-        rb.linearVelocity = new Vector2(moveDirection.x * moveSpeed, moveDirection.y * moveSpeed);
+        RaycastHit2D hit = Physics2D.Raycast(rb.position, facingDirection, attackRange, enemyLayer);
+
+        if (hit.collider != null)
+        {
+            GameObject hitObject = hit.collider.gameObject;
+
+            Enemy enemy = hitObject.GetComponent<Enemy>();
+            if (enemy != null)
+            {
+                enemy.TakeDamage(damage, rb.position.x); // Assume TakeDamage method exists in the Enemy script
+            }
+        }
+    }
+
+    private void Jump(InputAction.CallbackContext context)
+    {
+        if (isGrounded)
+        {
+            rb.AddForce(new Vector2(0, 10f), ForceMode2D.Impulse);
+        }
     }
 }
